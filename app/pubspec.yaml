@@ -1,0 +1,79 @@
+name: vanishvault
+description: Decentralized cross-platform app with local encryption, P2P storage via Walrus, and 24-hour self-destruction timer on Sui blockchain.
+publish_to: 'none'
+
+version: 1.0.0+1
+
+environment:
+  sdk: '>=3.0.0 <4.0.0'
+
+dependencies:
+  flutter:
+    sdk: flutter
+  cupertino_icons: ^1.0.2
+  
+  # State Management
+  riverpod: ^2.4.0
+  flutter_riverpod: ^2.4.0
+  riverpod_generator: ^2.3.0
+  
+  # Sui & Blockchain
+  sui: ^0.6.0
+  web3dart: ^2.7.1
+  
+  # Encryption & Security
+  cryptography: ^2.1.0
+  pointycastle: ^3.7.0
+  
+  # Storage & File Management
+  path_provider: ^2.1.0
+  file: ^7.0.0
+  permission_handler: ^11.4.0
+  
+  # P2P & Networking
+  dio: ^5.3.0
+  connectivity_plus: ^5.0.0
+  
+  # JSON & Serialization
+  json_serializable: ^6.7.0
+  json_annotation: ^4.8.0
+  
+  # UI & UX
+  google_fonts: ^6.1.0
+  flutter_animate: ^4.2.0
+  shimmer: ^3.0.0
+  
+  # Logging & Debugging
+  logger: ^2.0.0
+  talker: ^3.2.0
+  
+  # Time Management
+  timezone: ^0.9.0
+  intl: ^0.19.0
+  
+  # Platform Specific
+  flutter_secure_storage: ^9.0.0
+  share_plus: ^7.0.0
+
+dev_dependencies:
+  flutter_test:
+    sdk: flutter
+  flutter_lints: ^2.0.0
+  build_runner: ^2.4.0
+  riverpod_generator: ^2.3.0
+  json_serializable: ^6.7.0
+  mockito: ^5.4.0
+
+flutter:
+  uses-material-design: true
+  assets:
+    - assets/images/
+    - assets/icons/
+  fonts:
+    - family: Poppins
+      fonts:
+        - asset: assets/fonts/Poppins-Regular.ttf
+        - asset: assets/fonts/Poppins-Bold.ttf
+          weight: 700
+        - asset: assets/fonts/Poppins-SemiBold.ttf
+          weight: 600

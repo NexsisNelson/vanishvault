@@ -1,0 +1,70 @@
+# Flutter & Dart
+.dart_tool/
+.flutter-plugins
+.flutter-plugins-dependencies
+.packages
+build/
+.pub/
+pubspec.lock
+*.iml
+.idea/
+.gradle/
+local.properties
+*.log
+
+# iOS
+ios/Flutter/Flutter.podspec
+ios/Flutter/Flutter.xcconfig
+ios/Flutter/flutter_export_environment.sh
+ios/Runner.xcworkspace/
+ios/Pods/
+.ios/
+
+# Android
+android/.gradle/
+android/local.properties
+android/app/debug/
+android/app/profile/
+android/app/release/
+*.apk
+*.aab
+
+# Move/Sui
+contracts/build/
+contracts/target/
+Move.lock
+
+# Environment & Secrets
+.env
+.env.local
+.env.*.local
+*.key
+*.pem
+
+# IDE
+.vscode/
+.code-workspace
+*.swp
+*.swo
+*~
+.DS_Store
+
+# Build artifacts
+dist/
+*.o
+*.so
+*.dylib
+*.dll
+*.exe
+
+# Node (if any web3 utilities used)
+node_modules/
+npm-debug.log
+yarn-error.log
+
+# Python (for scripts)
+__pycache__/
+*.py[cod]
+*$py.class
+venv/
+env/
