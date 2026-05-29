@@ -3,139 +3,133 @@ module vanishvault::vanishvault {
     use sui::tx_context::{Self, TxContext};
     use sui::transfer;
     use sui::clock::{Self, Clock};
-    use std::string::String;
 
-    /// Represents an encrypted file stored on Walrus
-    public struct EncryptedFile has key, store {
+    /// DataRoom: Stores encrypted file metadata with 24-hour countdown timer
+    /// The creator can always delete it, but anyone can delete after expiration
+    public struct DataRoom has key {
         id: UID,
-        owner: address,
-        walrus_path: String,
-        content_hash: vector<u8>,
+        creator: address,
+        receiver: address,
+        walrus_blob_id: u256,
         created_at: u64,
-        destruction_time: u64,
-        is_destroyed: bool,
-        access_key: vector<u8>,
+        expires_at: u64,
     }
 
-    /// Event emitted when a file is uploaded
-    public struct FileUploaded has copy, drop {
-        file_id: object::ID,
-        owner: address,
+    /// Event: Emitted when a new DataRoom is created
+    public struct RoomCreated has copy, drop {
+        room_id: object::ID,
+        creator: address,
+        receiver: address,
         created_at: u64,
-        destruction_time: u64,
+        expires_at: u64,
     }
 
-    /// Event emitted when a file is destroyed
-    public struct FileDestroyed has copy, drop {
-        file_id: object::ID,
+    /// Event: Emitted when a DataRoom is destroyed
+    public struct RoomDestroyed has copy, drop {
+        room_id: object::ID,
         destroyed_at: u64,
     }
 
-    /// Event emitted when a file is accessed
-    public struct FileAccessed has copy, drop {
-        file_id: object::ID,
-        accessed_by: address,
-        accessed_at: u64,
-    }
+    const TWENTYFOUR_HOURS_MS: u64 = 86400000; // 24 hours in milliseconds
+    const EUnauthorizedAccess: u64 = 1;
+    const EDataRoomExpired: u64 = 2;
 
-    const TWENTYFOUR_HOURS: u64 = 86400000; // milliseconds
-    const EFileNotFound: u64 = 1;
-    const EFileAlreadyDestroyed: u64 = 2;
-    const EUnauthorizedAccess: u64 = 3;
-    const EDestructionTimeNotReached: u64 = 4;
-
-    /// Upload an encrypted file to Walrus
-    public fun upload_file(
-        walrus_path: String,
-        content_hash: vector<u8>,
-        access_key: vector<u8>,
+    /// Entry function: Create a new DataRoom
+    /// Called by the uploader's frontend transaction.
+    /// Sets expires_at = current_time + 24 hours
+    public entry fun create_room(
+        walrus_blob_id: u256,
+        receiver: address,
         clock: &Clock,
         ctx: &mut TxContext,
-    ): EncryptedFile {
+    ) {
         let now = clock::timestamp_ms(clock);
-        let destruction_time = now + TWENTYFOUR_HOURS;
+        let expires_at = now + TWENTYFOUR_HOURS_MS;
 
-        let file = EncryptedFile {
+        let room = DataRoom {
             id: object::new(ctx),
-            owner: tx_context::sender(ctx),
-            walrus_path,
-            content_hash,
+            creator: tx_context::sender(ctx),
+            receiver,
+            walrus_blob_id,
             created_at: now,
-            destruction_time,
-            is_destroyed: false,
-            access_key,
+            expires_at,
         };
 
-        let file_id = object::id(&file);
-        transfer::share_object(file);
+        let room_id = object::id(&room);
+        
+        // Share the DataRoom so both creator and receiver can access it
+        transfer::share_object(room);
 
-        sui::event::emit(FileUploaded {
-            file_id,
-            owner: tx_context::sender(ctx),
+        sui::event::emit(RoomCreated {
+            room_id,
+            creator: tx_context::sender(ctx),
+            receiver,
             created_at: now,
-            destruction_time,
+            expires_at,
         });
-
-        file
     }
 
-    /// Retrieve access to an encrypted file
-    public fun retrieve_file(
-        file: &EncryptedFile,
+    /// Read-only verification function
+    /// Returns the Walrus blob_id only if:
+    /// 1. Current time is BEFORE expires_at
+    /// 2. Caller address matches the receiver address
+    /// Aborts otherwise.
+    public fun get_blob_id(room: &DataRoom, clock: &Clock, ctx: &TxContext): u256 {
+        let now = clock::timestamp_ms(clock);
+        
+        // Check if room has expired
+        assert!(now < room.expires_at, EDataRoomExpired);
+        
+        // Check if caller is authorized receiver
+        assert!(tx_context::sender(ctx) == room.receiver, EUnauthorizedAccess);
+
+        room.walrus_blob_id
+    }
+
+    /// Entry function: Destroy and expire a DataRoom
+    /// Can be called by:
+    /// 1. The creator at any time, OR
+    /// 2. Anyone if the room has expired (automated cleanup)
+    public entry fun destroy_and_expire(
+        room: DataRoom,
         clock: &Clock,
         ctx: &TxContext,
-    ): (String, vector<u8>) {
-        assert!(!file.is_destroyed, EFileAlreadyDestroyed);
-        assert!(file.owner == tx_context::sender(ctx), EUnauthorizedAccess);
-
-        let now = clock::timestamp_ms(clock);
-        assert!(now <= file.destruction_time, EDestructionTimeNotReached);
-
-        sui::event::emit(FileAccessed {
-            file_id: object::id(file),
-            accessed_by: tx_context::sender(ctx),
-            accessed_at: now,
-        });
-
-        (file.walrus_path, file.access_key)
-    }
-
-    /// Force destroy a file after 24 hours
-    public fun destroy_file(
-        file: &mut EncryptedFile,
-        clock: &Clock,
-        _ctx: &TxContext,
     ) {
-        assert!(!file.is_destroyed, EFileAlreadyDestroyed);
-
         let now = clock::timestamp_ms(clock);
-        assert!(now >= file.destruction_time, EDestructionTimeNotReached);
+        let caller = tx_context::sender(ctx);
 
-        file.is_destroyed = true;
+        // Check: either caller is creator, or room has expired
+        let is_creator = caller == room.creator;
+        let has_expired = now >= room.expires_at;
 
-        sui::event::emit(FileDestroyed {
-            file_id: object::id(file),
+        assert!(is_creator || has_expired, EUnauthorizedAccess);
+
+        let room_id = object::id(&room);
+        object::delete(room.id);
+
+        sui::event::emit(RoomDestroyed {
+            room_id,
             destroyed_at: now,
         });
     }
 
-    /// Query file status
-    public fun get_file_info(file: &EncryptedFile): (address, u64, u64, bool) {
-        (file.owner, file.created_at, file.destruction_time, file.is_destroyed)
+    /// Getter: Check if room has expired
+    public fun is_expired(room: &DataRoom, clock: &Clock): bool {
+        clock::timestamp_ms(clock) >= room.expires_at
     }
 
-    /// Check if file can be destroyed
-    public fun can_destroy(file: &EncryptedFile, clock: &Clock): bool {
-        !file.is_destroyed && clock::timestamp_ms(clock) >= file.destruction_time
-    }
-
-    /// Get remaining time until destruction (in milliseconds)
-    public fun time_until_destruction(file: &EncryptedFile, clock: &Clock): u64 {
+    /// Getter: Get remaining time until expiration (in milliseconds)
+    public fun time_until_expiration(room: &DataRoom, clock: &Clock): u64 {
         let now = clock::timestamp_ms(clock);
-        if (now >= file.destruction_time) {
+        if (now >= room.expires_at) {
             0
         } else {
-            file.destruction_time - now
+            room.expires_at - now
         }
+    }
+
+    /// Getter: Check room info
+    public fun get_room_info(room: &DataRoom): (address, address, u64, u64) {
+        (room.creator, room.receiver, room.created_at, room.expires_at)
     }
 }

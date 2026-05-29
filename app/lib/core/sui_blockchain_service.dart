@@ -1,6 +1,7 @@
 import 'package:logger/logger.dart';
 
 /// Handles Sui blockchain interactions for VanishVault
+/// This service builds and signs transactions for the Move contract
 class SuiBlockchainService {
   final String rpcUrl;
   final String packageId;
@@ -13,6 +14,7 @@ class SuiBlockchainService {
   }) : _logger = logger ?? Logger();
 
   /// Initialize wallet connection (placeholder for actual implementation)
+  /// In production, this would establish connection with Sui Wallet
   Future<void> connectWallet() async {
     try {
       _logger.i('Connecting to Sui wallet...');
@@ -24,151 +26,232 @@ class SuiBlockchainService {
     }
   }
 
-  /// Execute smart contract function to upload file
+  /// Entry point: Register a DataRoom on the Sui blockchain
+  /// This is called by the uploader's frontend after uploading to Walrus
+  ///
+  /// Constructs and signs a transaction block (PTB) that calls:
+  ///   create_room(walrus_blob_id: u256, receiver: address, clock: &Clock)
+  ///
   /// Returns the transaction digest
-  Future<String> uploadFileToContract({
-    required String walrusPath,
-    required List<int> contentHash,
-    required List<int> accessKey,
+  Future<String> registerDataRoom({
+    required String blobId,
+    required String receiverAddress,
     required String walletAddress,
   }) async {
     try {
-      _logger.i('Uploading file to Sui contract...');
+      _logger.i('Registering DataRoom on Sui blockchain...');
+      _logger.i('  Blob ID: $blobId');
+      _logger.i('  Receiver: $receiverAddress');
 
-      // Build transaction
-      final txn = _buildUploadTransaction(
-        walrusPath: walrusPath,
-        contentHash: contentHash,
-        accessKey: accessKey,
+      // Convert hex blob ID string to u256 (BigInt)
+      final blobIdBigInt = _hexStringToU256(blobId);
+
+      // Build TransactionBlock (PTB)
+      final ptb = _buildRegisterDataRoomTransaction(
+        blobIdBigInt: blobIdBigInt,
+        receiverAddress: receiverAddress,
       );
 
-      // Execute transaction (placeholder)
-      final digest = 'txn_digest_${DateTime.now().millisecondsSinceEpoch}';
+      _logger.d('Transaction block built: $ptb');
 
-      _logger.i('File uploaded to contract. Tx: $digest');
-      return digest;
+      // Sign and execute transaction (placeholder - actual impl uses sui package)
+      final txDigest = _signAndExecuteTransaction(
+        ptb: ptb,
+        walletAddress: walletAddress,
+      );
+
+      _logger.i('DataRoom registered. Tx: $txDigest');
+      return txDigest;
     } catch (e) {
-      _logger.e('Failed to upload file to contract: $e');
+      _logger.e('Failed to register DataRoom: $e');
       rethrow;
     }
   }
 
-  /// Retrieve file metadata from contract
-  Future<Map<String, dynamic>> getFileMetadata(String fileObjectId) async {
+  /// Fetch blob ID from the blockchain
+  /// Calls the read-only get_blob_id() function on the Move contract
+  ///
+  /// This function:
+  /// 1. Verifies the caller is the authorized receiver
+  /// 2. Checks that the 24-hour timer hasn't expired
+  /// 3. Returns the Walrus blob ID if both checks pass
+  Future<String> fetchBlobIdFromChain(String dataRoomObjectId) async {
     try {
-      _logger.i('Fetching file metadata from contract...');
+      _logger.i('Fetching blob ID from Sui contract...');
 
-      // Query contract state (placeholder)
-      return {
-        'owner': '0x0',
-        'created_at': DateTime.now().millisecondsSinceEpoch,
-        'destruction_time': DateTime.now()
-            .add(const Duration(hours: 24))
-            .millisecondsSinceEpoch,
-        'is_destroyed': false,
-      };
+      // Call get_blob_id() on the contract (read-only)
+      // The contract will verify authorization and expiration
+      final blobIdU256 = await _callGetBlobId(dataRoomObjectId);
+
+      // Convert u256 back to hex string
+      final blobIdHex = _u256ToHexString(blobIdU256);
+
+      _logger.i('Blob ID retrieved: $blobIdHex');
+      return blobIdHex;
     } catch (e) {
-      _logger.e('Failed to fetch metadata: $e');
+      _logger.e('Failed to fetch blob ID: $e');
       rethrow;
     }
   }
 
-  /// Trigger file destruction on contract
-  Future<String> destroyFile(String fileObjectId) async {
+  /// Destroy a DataRoom on the blockchain
+  /// Calls destroy_and_expire() which permanently deletes the DataRoom object
+  ///
+  /// Can be called by:
+  /// - The creator at any time
+  /// - Anyone if the DataRoom has expired (automated cleanup)
+  Future<String> destroyAndExpire(String dataRoomObjectId) async {
     try {
-      _logger.i('Destroying file on contract...');
+      _logger.i('Destroying DataRoom on Sui blockchain...');
 
       // Build destroy transaction
-      final txn = _buildDestroyTransaction(fileObjectId);
+      final ptb = _buildDestroyTransaction(dataRoomObjectId);
 
-      // Execute transaction (placeholder)
-      final digest = 'destroy_${DateTime.now().millisecondsSinceEpoch}';
+      // Sign and execute (placeholder)
+      final txDigest = await _executeDestroyTransaction(ptb);
 
-      _logger.i('File destroyed. Tx: $digest');
-      return digest;
+      _logger.i('DataRoom destroyed. Tx: $txDigest');
+      return txDigest;
     } catch (e) {
-      _logger.e('Failed to destroy file: $e');
+      _logger.e('Failed to destroy DataRoom: $e');
       rethrow;
     }
   }
 
-  /// Check if file can be destroyed (24 hours passed)
-  Future<bool> canDestroyFile(String fileObjectId) async {
+  /// Check if a DataRoom has expired based on the blockchain clock
+  Future<bool> hasDataRoomExpired(String dataRoomObjectId) async {
     try {
-      final metadata = await getFileMetadata(fileObjectId);
-      final destructionTime = metadata['destruction_time'] as int;
-      final now = DateTime.now().millisecondsSinceEpoch;
-      return now >= destructionTime;
+      // Query contract state for expiration time
+      final isExpired = await _queryIsExpired(dataRoomObjectId);
+      return isExpired;
     } catch (e) {
-      _logger.e('Failed to check destruction eligibility: $e');
-      return false;
+      _logger.e('Failed to check expiration: $e');
+      return true; // Fail safe: assume expired
     }
   }
 
-  /// Get time remaining until destruction
-  Future<Duration> getTimeUntilDestruction(String fileObjectId) async {
+  /// Get time remaining until DataRoom expires (in milliseconds)
+  Future<Duration> getTimeUntilExpiration(String dataRoomObjectId) async {
     try {
-      final metadata = await getFileMetadata(fileObjectId);
-      final destructionTime = metadata['destruction_time'] as int;
-      final now = DateTime.now().millisecondsSinceEpoch;
-
-      final remaining = destructionTime - now;
-      if (remaining <= 0) {
-        return Duration.zero;
-      }
-
-      return Duration(milliseconds: remaining);
+      final remainingMs = await _queryTimeUntilExpiration(dataRoomObjectId);
+      return Duration(milliseconds: remainingMs);
     } catch (e) {
-      _logger.e('Failed to get time until destruction: $e');
-      rethrow;
+      _logger.e('Failed to get remaining time: $e');
+      return Duration.zero; // Fail safe
     }
   }
 
-  /// Build upload transaction (placeholder)
-  Map<String, dynamic> _buildUploadTransaction({
-    required String walrusPath,
-    required List<int> contentHash,
-    required List<int> accessKey,
+  // ============= Helper Methods =============
+
+  /// Convert hex string (0x...) to u256 (BigInt)
+  BigInt _hexStringToU256(String hexString) {
+    final cleanHex = hexString.startsWith('0x')
+        ? hexString.substring(2)
+        : hexString;
+    return BigInt.parse(cleanHex, radix: 16);
+  }
+
+  /// Convert u256 (BigInt) to hex string (0x...)
+  String _u256ToHexString(BigInt value) {
+    return '0x${value.toRadixString(16)}';
+  }
+
+  /// Build a ProgrammableTransactionBlock for registering a DataRoom
+  Map<String, dynamic> _buildRegisterDataRoomTransaction({
+    required BigInt blobIdBigInt,
+    required String receiverAddress,
   }) {
     return {
       'kind': 'ProgrammableTransaction',
       'inputs': [
-        {'kind': 'pure', 'value': walrusPath, 'valueType': 'string'},
-        {'kind': 'pure', 'value': contentHash, 'valueType': 'vector<u8>'},
-        {'kind': 'pure', 'value': accessKey, 'valueType': 'vector<u8>'},
+        {'kind': 'pure', 'value': blobIdBigInt.toString(), 'valueType': 'u256'},
+        {'kind': 'pure', 'value': receiverAddress, 'valueType': 'address'},
+        {
+          'kind': 'object',
+          'objectId': '0x6',
+          'version': 0, // System clock object
+          'digest': 'Hs6vWJhGyqWzPQb3EKxbN1Q9xdNLNSvGVmfnhddpV5p',
+          'mutable': false,
+        },
       ],
       'transactions': [
         {
           'MoveCall': {
             'package': packageId,
             'module': 'vanishvault',
-            'function': 'upload_file',
+            'function': 'create_room',
             'typeArguments': [],
-            'arguments': [0, 1, 2],
+            'arguments': [0, 1, 2], // Input indices
           },
         },
       ],
     };
   }
 
-  /// Build destroy transaction (placeholder)
-  Map<String, dynamic> _buildDestroyTransaction(String fileObjectId) {
+  /// Build a destroy transaction
+  Map<String, dynamic> _buildDestroyTransaction(String dataRoomObjectId) {
     return {
       'kind': 'ProgrammableTransaction',
       'inputs': [
-        {'kind': 'object', 'value': fileObjectId},
+        {'kind': 'object', 'objectId': dataRoomObjectId, 'mutable': true},
+        {
+          'kind': 'object',
+          'objectId': '0x6', // System clock
+          'version': 0,
+          'digest': 'Hs6vWJhGyqWzPQb3EKxbN1Q9xdNLNSvGVmfnhddpV5p',
+          'mutable': false,
+        },
       ],
       'transactions': [
         {
           'MoveCall': {
             'package': packageId,
             'module': 'vanishvault',
-            'function': 'destroy_file',
+            'function': 'destroy_and_expire',
             'typeArguments': [],
-            'arguments': [0],
+            'arguments': [0, 1],
           },
         },
       ],
     };
+  }
+
+  /// Sign and execute a transaction block (placeholder)
+  /// In production, this would use @mysten/sui.js to sign via wallet
+  String _signAndExecuteTransaction({
+    required Map<String, dynamic> ptb,
+    required String walletAddress,
+  }) {
+    _logger.d('Signing transaction with wallet: $walletAddress');
+    // Placeholder: actual implementation would sign with wallet SDK
+    return 'txn_${DateTime.now().millisecondsSinceEpoch}';
+  }
+
+  /// Call get_blob_id() on the contract (placeholder)
+  Future<BigInt> _callGetBlobId(String dataRoomObjectId) async {
+    _logger.d('Calling get_blob_id for DataRoom: $dataRoomObjectId');
+    // Placeholder: actual implementation would call via RPC
+    return BigInt.parse('0', radix: 16);
+  }
+
+  /// Execute destroy transaction (placeholder)
+  Future<String> _executeDestroyTransaction(Map<String, dynamic> ptb) async {
+    _logger.d('Executing destroy transaction...');
+    // Placeholder
+    return 'destroy_${DateTime.now().millisecondsSinceEpoch}';
+  }
+
+  /// Query is_expired() function (placeholder)
+  Future<bool> _queryIsExpired(String dataRoomObjectId) async {
+    _logger.d('Querying expiration status...');
+    // Placeholder
+    return false;
+  }
+
+  /// Query time_until_expiration() function (placeholder)
+  Future<int> _queryTimeUntilExpiration(String dataRoomObjectId) async {
+    _logger.d('Querying time until expiration...');
+    // Placeholder
+    return 86400000; // 24 hours
   }
 }

@@ -18,7 +18,7 @@ dependencies:
   riverpod_generator: ^2.3.0
   
   # Sui & Blockchain
-  sui: ^0.6.0
+  sui: ^0.3.7
   web3dart: ^2.7.1
   
   # Encryption & Security
