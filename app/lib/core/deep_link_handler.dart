@@ -35,18 +35,91 @@ class DeepLinkHandler {
         }
 
         // Try base64 decode, otherwise treat as JSON string
-        String signedJson;
+        String signedJsonRaw;
         try {
           final decoded = base64Decode(signed);
-          signedJson = utf8.decode(decoded);
+          signedJsonRaw = utf8.decode(decoded);
         } catch (_) {
-          signedJson = Uri.decodeComponent(signed);
+          signedJsonRaw = Uri.decodeComponent(signed);
         }
 
-        _logger.d('Parsed signed payload: $signedJson');
+        _logger.d('Parsed raw signed payload: $signedJsonRaw');
+
+        // Heuristic parsing for wallet-specific wrappers (Phantom/Slush etc.)
+        String finalSignedPayload = signedJsonRaw;
+        try {
+          final parsed = jsonDecode(signedJsonRaw);
+          if (parsed is Map<String, dynamic>) {
+            // Common wrapper keys that wallets may use
+            final candidates = [
+              'signed_tx',
+              'signedTx',
+              'signedTransaction',
+              'signed',
+              'tx',
+              'txBytes',
+              'tx_bytes',
+              'result',
+              'data',
+              'payload'
+            ];
+
+            String? extracted;
+            for (final k in candidates) {
+              if (parsed.containsKey(k)) {
+                final v = parsed[k];
+                if (v is String) {
+                  extracted = v;
+                  break;
+                } else if (v is Map || v is List) {
+                  extracted = jsonEncode(v);
+                  break;
+                }
+              }
+            }
+
+            // Some wallets nest the signed tx inside `result` -> `txBytes` or similar
+            if (extracted == null && parsed.containsKey('result')) {
+              final r = parsed['result'];
+              if (r is Map) {
+                for (final k in [
+                  'txBytes',
+                  'tx_bytes',
+                  'signedTransaction',
+                  'signed_tx'
+                ]) {
+                  if (r.containsKey(k)) {
+                    final v = r[k];
+                    extracted = v is String ? v : jsonEncode(v);
+                    break;
+                  }
+                }
+              }
+            }
+
+            if (extracted != null) {
+              // Try to base64-decode inner value if it looks encoded
+              try {
+                final innerDecoded = base64Decode(extracted);
+                finalSignedPayload = utf8.decode(innerDecoded);
+              } catch (_) {
+                finalSignedPayload = extracted;
+              }
+            } else {
+              // If no wrapper found, keep original raw JSON string
+              finalSignedPayload = jsonEncode(parsed);
+            }
+          }
+        } catch (e) {
+          _logger
+              .d('DeepLinkHandler: payload is not JSON or parsing failed: $e');
+        }
+
+        _logger.d('Final signed payload to submit: $finalSignedPayload');
 
         // Submit signed transaction to Sui RPC via service
-        final txDigest = await suiService.submitSignedTransaction(signedJson);
+        final txDigest =
+            await suiService.submitSignedTransaction(finalSignedPayload);
         _logger.i('Submitted signed tx. Digest: $txDigest');
       } catch (e) {
         _logger.e('Failed to handle deep link: $e');
