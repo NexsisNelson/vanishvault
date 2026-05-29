@@ -1,0 +1,21 @@
+<!--
+Add this `intent-filter` fragment inside your <activity android:name=".MainActivity"> element
+in `android/app/src/main/AndroidManifest.xml`.
+-->
+
+<!-- Deep link custom scheme (vanishvault://) -->
+<intent-filter>
+  <action android:name="android.intent.action.VIEW" />
+  <category android:name="android.intent.category.DEFAULT" />
+  <category android:name="android.intent.category.BROWSABLE" />
+  <data android:scheme="vanishvault" android:host="signed_tx_callback" />
+</intent-filter>
+
+<!-- Example universal links for Phantom and Slush domains -->
+<intent-filter android:autoVerify="true">
+  <action android:name="android.intent.action.VIEW" />
+  <category android:name="android.intent.category.DEFAULT" />
+  <category android:name="android.intent.category.BROWSABLE" />
+  <data android:scheme="https" android:host="phantom.app" android:pathPrefix="/ul/" />
+  <data android:scheme="https" android:host="my.slush.app" android:pathPrefix="/sui/" />
+</intent-filter>

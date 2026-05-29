@@ -1,0 +1,25 @@
+<!--
+Add these entries to `ios/Runner/Info.plist` under the root <dict>.
+-->
+
+<!-- Custom URL scheme -->
+<key>CFBundleURLTypes</key>
+<array>
+  <dict>
+    <key>CFBundleTypeRole</key>
+    <string>Editor</string>
+    <key>CFBundleURLName</key>
+    <string>com.yourcompany.vanishvault</string>
+    <key>CFBundleURLSchemes</key>
+    <array>
+      <string>vanishvault</string>
+    </array>
+  </dict>
+</array>
+
+<!-- Associated domains for universal links (enable Associated Domains capability in Xcode) -->
+<key>com.apple.developer.associated-domains</key>
+<array>
+  <string>applinks:phantom.app</string>
+  <string>applinks:my.slush.app</string>
+</array>
