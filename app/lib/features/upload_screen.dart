@@ -10,12 +10,15 @@ class FileUploadScreen extends ConsumerStatefulWidget {
 
 class _FileUploadScreenState extends ConsumerState<FileUploadScreen> {
   String? _selectedFilePath;
-  final _passphraseController = TextEditingController();
-  bool _showPassphrase = false;
+  final _receiverController = TextEditingController();
+  final _walletController = TextEditingController();
+
+  String? _selectedFilePath;
 
   @override
   void dispose() {
-    _passphraseController.dispose();
+    _receiverController.dispose();
+    _walletController.dispose();
     super.dispose();
   }
 
@@ -55,26 +58,29 @@ class _FileUploadScreenState extends ConsumerState<FileUploadScreen> {
           ),
           const SizedBox(height: 24),
 
-          // Passphrase Input
+          // Receiver Address Input
           TextField(
-            controller: _passphraseController,
-            obscureText: !_showPassphrase,
-            decoration: InputDecoration(
-              labelText: 'Encryption Passphrase',
-              hintText: 'Enter a strong passphrase',
-              border: const OutlineInputBorder(),
-              suffixIcon: IconButton(
-                icon: Icon(
-                  _showPassphrase ? Icons.visibility_off : Icons.visibility,
-                ),
-                onPressed: () {
-                  setState(() {
-                    _showPassphrase = !_showPassphrase;
-                  });
-                },
-              ),
+            controller: _receiverController,
+            decoration: const InputDecoration(
+              labelText: 'Receiver Sui Address',
+              hintText: 'Enter receiver Sui address (0x...)',
+              border: OutlineInputBorder(),
+              prefixIcon: Icon(Icons.account_circle_outlined),
             ),
           ),
+          const SizedBox(height: 12),
+
+          // Wallet Address Input (uploader)
+          TextField(
+            controller: _walletController,
+            decoration: const InputDecoration(
+              labelText: 'Your Wallet Address',
+              hintText: 'Enter your wallet address (for signing)',
+              border: OutlineInputBorder(),
+              prefixIcon: Icon(Icons.account_balance_wallet_outlined),
+            ),
+          ),
+          const SizedBox(height: 16),
           const SizedBox(height: 16),
 
           // Password Requirements
@@ -140,9 +146,9 @@ class _FileUploadScreenState extends ConsumerState<FileUploadScreen> {
 
           // Upload Button
           ElevatedButton.icon(
-            onPressed:
-                _selectedFilePath != null &&
-                    _passphraseController.text.isNotEmpty &&
+            onPressed: _selectedFilePath != null &&
+                    _receiverController.text.isNotEmpty &&
+                    _walletController.text.isNotEmpty &&
                     !fileOpState.isLoading
                 ? _uploadFile
                 : null,
@@ -152,6 +158,12 @@ class _FileUploadScreenState extends ConsumerState<FileUploadScreen> {
               padding: const EdgeInsets.symmetric(vertical: 16),
             ),
           ),
+
+          const SizedBox(height: 16),
+
+          // Display generated key/material after upload
+          if (!fileOpState.isLoading && fileOpState.progress == 1.0)
+            const SizedBox(height: 8),
         ],
       ),
     );
@@ -166,23 +178,45 @@ class _FileUploadScreenState extends ConsumerState<FileUploadScreen> {
 
   Future<void> _uploadFile() async {
     try {
-      final digest = await ref
-          .read(fileOperationProvider.notifier)
-          .uploadFile(
+      final result = await ref.read(fileOperationProvider.notifier).uploadFile(
             filePath: _selectedFilePath!,
-            passphrase: _passphraseController.text,
+            receiverAddress: _receiverController.text,
+            walletAddress: _walletController.text,
           );
 
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('File uploaded! Tx: $digest'),
-            action: SnackBarAction(
-              label: 'Copy',
-              onPressed: () {
-                // Copy to clipboard
-              },
+        final tx = result['txDigest'];
+        final blobId = result['blobId'];
+        final keyHex = result['keyHex'];
+        final nonce = result['nonce'];
+        final mac = result['mac'];
+
+        showDialog(
+          context: context,
+          builder: (ctx) => AlertDialog(
+            title: const Text('Shareable Key Material'),
+            content: SingleChildScrollView(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text('Tx: $tx'),
+                  const SizedBox(height: 8),
+                  SelectableText('Blob ID: $blobId'),
+                  const SizedBox(height: 8),
+                  SelectableText('Key (hex): $keyHex'),
+                  const SizedBox(height: 8),
+                  SelectableText('Nonce (base64): $nonce'),
+                  const SizedBox(height: 8),
+                  SelectableText('MAC (base64): $mac'),
+                ],
+              ),
             ),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.of(ctx).pop(),
+                child: const Text('Close'),
+              ),
+            ],
           ),
         );
       }

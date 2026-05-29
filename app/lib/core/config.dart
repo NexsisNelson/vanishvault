@@ -78,4 +78,7 @@ class EnvironmentConfig {
   }
 
   static bool get debugMode => current != Environment.production;
+
+  // Deployed package ID for the Move contract
+  static String packageId = 'YOUR_PACKAGE_ID_HERE';
 }

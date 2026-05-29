@@ -10,13 +10,17 @@ class RetrieveScreen extends ConsumerStatefulWidget {
 
 class _RetrieveScreenState extends ConsumerState<RetrieveScreen> {
   final _blobIdController = TextEditingController();
-  final _passphraseController = TextEditingController();
+  final _keyHexController = TextEditingController();
+  final _nonceController = TextEditingController();
+  final _macController = TextEditingController();
   bool _showPassphrase = false;
 
   @override
   void dispose() {
     _blobIdController.dispose();
-    _passphraseController.dispose();
+    _keyHexController.dispose();
+    _nonceController.dispose();
+    _macController.dispose();
     super.dispose();
   }
 
@@ -41,26 +45,38 @@ class _RetrieveScreenState extends ConsumerState<RetrieveScreen> {
           ),
           const SizedBox(height: 24),
 
-          // Passphrase Input
+          // Key Hex
           TextField(
-            controller: _passphraseController,
-            obscureText: !_showPassphrase,
-            decoration: InputDecoration(
-              labelText: 'Decryption Passphrase',
-              hintText: 'Enter the passphrase used during upload',
-              border: const OutlineInputBorder(),
-              suffixIcon: IconButton(
-                icon: Icon(
-                  _showPassphrase ? Icons.visibility_off : Icons.visibility,
-                ),
-                onPressed: () {
-                  setState(() {
-                    _showPassphrase = !_showPassphrase;
-                  });
-                },
-              ),
+            controller: _keyHexController,
+            decoration: const InputDecoration(
+              labelText: 'Key (hex)',
+              hintText: 'Paste key hex from sender',
+              border: OutlineInputBorder(),
             ),
           ),
+          const SizedBox(height: 12),
+
+          // Nonce (base64)
+          TextField(
+            controller: _nonceController,
+            decoration: const InputDecoration(
+              labelText: 'Nonce (base64)',
+              hintText: 'Paste nonce (base64)',
+              border: OutlineInputBorder(),
+            ),
+          ),
+          const SizedBox(height: 12),
+
+          // MAC (base64)
+          TextField(
+            controller: _macController,
+            decoration: const InputDecoration(
+              labelText: 'MAC (base64)',
+              hintText: 'Paste MAC (base64)',
+              border: OutlineInputBorder(),
+            ),
+          ),
+          const SizedBox(height: 16),
           const SizedBox(height: 24),
 
           // Info Card
@@ -137,9 +153,10 @@ class _RetrieveScreenState extends ConsumerState<RetrieveScreen> {
 
           // Retrieve Button
           ElevatedButton.icon(
-            onPressed:
-                _blobIdController.text.isNotEmpty &&
-                    _passphraseController.text.isNotEmpty &&
+            onPressed: _blobIdController.text.isNotEmpty &&
+                    _keyHexController.text.isNotEmpty &&
+                    _nonceController.text.isNotEmpty &&
+                    _macController.text.isNotEmpty &&
                     !fileOpState.isLoading
                 ? _retrieveFile
                 : null,
@@ -156,10 +173,23 @@ class _RetrieveScreenState extends ConsumerState<RetrieveScreen> {
 
   Future<void> _retrieveFile() async {
     try {
-      // Implementation: call retrieve endpoint
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(const SnackBar(content: Text('Retrieving file...')));
+      final plaintext =
+          await ref.read(fileOperationProvider.notifier).retrieveFile(
+                dataRoomObjectId: _blobIdController.text.trim(),
+                keyHex: _keyHexController.text.trim(),
+                nonceBase64: _nonceController.text.trim(),
+                macBase64: _macController.text.trim(),
+              );
+
+      // Save plaintext to device
+      final savedPath = await ref
+          .read(localFileServiceProvider)
+          .saveFile(plaintext, 'retrieved_file');
+
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(content: Text('File retrieved and saved: $savedPath')));
+      }
     } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(

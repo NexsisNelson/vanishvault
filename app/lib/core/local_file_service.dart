@@ -58,6 +58,36 @@ class LocalFileService {
     }
   }
 
+  /// Save plaintext or generic bytes to app storage with original filename
+  Future<String> saveFile(
+    Uint8List data,
+    String originalFileName,
+  ) async {
+    try {
+      _logger.i('Saving file: $originalFileName');
+
+      final appDir = await getApplicationDocumentsDirectory();
+      final filesDir = Directory('${appDir.path}/files');
+
+      if (!await filesDir.exists()) {
+        await filesDir.create(recursive: true);
+      }
+
+      final timestamp = DateTime.now().millisecondsSinceEpoch;
+      final fileName = '${timestamp}_$originalFileName';
+      final filePath = '${filesDir.path}/$fileName';
+
+      final file = File(filePath);
+      await file.writeAsBytes(data);
+
+      _logger.i('File saved: $filePath');
+      return filePath;
+    } catch (e) {
+      _logger.e('Failed to save file: $e');
+      rethrow;
+    }
+  }
+
   /// Delete file from device storage
   Future<void> deleteFile(String filePath) async {
     try {
@@ -108,11 +138,8 @@ class LocalFileService {
         return [];
       }
 
-      final files = encryptedDir
-          .listSync()
-          .whereType<File>()
-          .map((f) => f.path)
-          .toList();
+      final files =
+          encryptedDir.listSync().whereType<File>().map((f) => f.path).toList();
 
       _logger.i('Found ${files.length} encrypted files');
       return files;
