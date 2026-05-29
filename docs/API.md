@@ -50,7 +50,11 @@ Future<List<String>> uploadMultipleFiles(Map<String, Uint8List> files)
 
 **Example:**
 ```dart
-final service = WalrusStorageService(walrusUrl: 'https://walrus.mainnet.sui.io');
+final service = WalrusStorageService(
+  walrusUrl: 'https://walrus.mainnet.sui.io',
+  publisherUrl: 'https://walrus.mainnet.sui.io',
+  aggregatorUrl: 'https://walrus.mainnet.sui.io',
+);
 final blobId = await service.uploadFile(encryptedData, 'file.txt');
 final downloaded = await service.downloadFile(blobId);
 ```

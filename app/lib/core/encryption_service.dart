@@ -6,17 +6,17 @@ import 'package:cryptography/cryptography.dart';
 /// Handles AES-256-GCM encryption for VanishVault
 /// Generates fresh random keys and nonces for each encryption operation.
 class EncryptionService {
-  static const _algorithm = AesGcm.with256bits;
+  static final _algorithm = AesGcm.with256bits();
 
   /// Encrypts a file using AES-256-GCM
   /// Generates a brand-new random 256-bit key and 12-byte nonce
   /// Returns the encrypted data with metadata needed for decryption
-  static Future<EncryptedFile> encryptFile(Uint8List plaintext) async {
+  Future<EncryptedFile> encryptFile(Uint8List plaintext) async {
     // Generate a brand-new random 256-bit AES secret key
     final secretKey = await _algorithm.newSecretKey();
 
     // Generate a random 12-byte initialization vector (nonce)
-    final nonce = _algorithm.newNonce();
+    final nonce = Uint8List.fromList(_algorithm.newNonce());
 
     // Encrypt the plaintext using AES-256-GCM
     final secretBox = await _algorithm.encrypt(
@@ -25,24 +25,24 @@ class EncryptionService {
     );
 
     // Extract raw key bytes for transmission (to be shared with receiver)
-    final keyBytes = await secretKey.extractBytes();
+    final keyBytes = Uint8List.fromList(await secretKey.extractBytes());
 
     return EncryptedFile(
-      ciphertext: secretBox.cipherText,
+      ciphertext: Uint8List.fromList(secretBox.cipherText),
       nonce: nonce,
-      mac: secretBox.mac.bytes,
+      mac: Uint8List.fromList(secretBox.mac.bytes),
       keyBytes: keyBytes,
     );
   }
 
   /// Decrypts a file using AES-256-GCM
   /// Requires the key and nonce that were generated during encryption
-  static Future<Uint8List> decryptFile(
+  Future<Uint8List> decryptFile(
     EncryptedFile encryptedFile,
     Uint8List keyBytes,
   ) async {
     // Reconstruct the SecretKey from the provided key bytes
-    final secretKey = await _algorithm.keyFromBytes(keyBytes);
+    final secretKey = SecretKey(keyBytes);
 
     // Create SecretBox from encrypted data
     final secretBox = SecretBox(
@@ -66,7 +66,7 @@ class EncryptionService {
   /// Generates a SHA-256 hash of data for integrity verification
   static Future<List<int>> generateHash(Uint8List data) async {
     final sha256 = Sha256();
-    final digest = await sha256.bind(data).first;
+    final digest = await sha256.hash(data);
     return digest.bytes;
   }
 
@@ -88,8 +88,8 @@ class EncryptionService {
 /// Encapsulates encrypted file data with all necessary metadata
 class EncryptedFile {
   final Uint8List ciphertext;
-  final List<int> nonce;
-  final List<int> mac;
+  final Uint8List nonce;
+  final Uint8List mac;
   final Uint8List keyBytes;
 
   EncryptedFile({

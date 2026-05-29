@@ -2,6 +2,7 @@
 library vanishvault_utils;
 
 import 'dart:convert';
+import 'dart:math';
 import 'dart:typed_data';
 
 /// Format bytes to human-readable size
@@ -71,12 +72,11 @@ String truncate(String text, int maxLength) {
 
 /// Generate a random string
 String generateRandomString(int length) {
-  const chars = 'AaBbCcDdEeFfGgHhIiJjKkLlMmNnOoPpQqRrSsTtUuVvWwXxYyZz0123456789';
+  const chars =
+      'AaBbCcDdEeFfGgHhIiJjKkLlMmNnOoPpQqRrSsTtUuVvWwXxYyZz0123456789';
   final random = <String>[];
   for (int i = 0; i < length; i++) {
     random.add(chars[DateTime.now().microsecond % chars.length]);
   }
   return random.join();
 }
-
-import 'dart:math';

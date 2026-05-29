@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import '../core/providers.dart';
 
 class RetrieveScreen extends ConsumerStatefulWidget {
   const RetrieveScreen({Key? key}) : super(key: key);
@@ -13,7 +14,6 @@ class _RetrieveScreenState extends ConsumerState<RetrieveScreen> {
   final _keyHexController = TextEditingController();
   final _nonceController = TextEditingController();
   final _macController = TextEditingController();
-  bool _showPassphrase = false;
 
   @override
   void dispose() {

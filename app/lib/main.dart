@@ -1,8 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'core/deep_link_handler.dart';
-import 'core/sui_blockchain_service.dart';
 import 'core/providers.dart';
+import 'features/upload_screen.dart';
+import 'features/retrieve_screen.dart';
+import 'features/wallet_session_screen.dart';
 
 void main() {
   runApp(const ProviderScope(child: VanishVaultApp()));
@@ -99,13 +101,21 @@ class HomeScreen extends StatelessWidget {
             ),
             const SizedBox(height: 48),
             ElevatedButton.icon(
-              onPressed: () {},
+              onPressed: () {
+                Navigator.of(context).push(
+                  MaterialPageRoute(builder: (_) => const FileUploadScreen()),
+                );
+              },
               icon: const Icon(Icons.upload_file),
               label: const Text('Encrypt & Upload'),
             ),
             const SizedBox(height: 16),
             OutlinedButton.icon(
-              onPressed: () {},
+              onPressed: () {
+                Navigator.of(context).push(
+                  MaterialPageRoute(builder: (_) => const RetrieveScreen()),
+                );
+              },
               icon: const Icon(Icons.file_download),
               label: const Text('Retrieve Files'),
             ),

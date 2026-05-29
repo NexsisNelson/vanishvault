@@ -1,3 +1,4 @@
+import 'dart:convert';
 import 'package:logger/logger.dart';
 import 'package:dio/dio.dart';
 import 'mobile_wallet_adapter.dart';

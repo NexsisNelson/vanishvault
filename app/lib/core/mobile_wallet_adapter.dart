@@ -7,7 +7,6 @@ import 'package:logger/logger.dart';
 class MobileWalletAdapter {
   final Logger _logger;
   WalletConnect? _connector;
-  SessionStatus? _session;
 
   MobileWalletAdapter({Logger? logger}) : _logger = logger ?? Logger();
 
@@ -25,7 +24,7 @@ class MobileWalletAdapter {
       );
 
       if (!_connector!.connected) {
-        _session = await _connector!.createSession(
+        await _connector!.createSession(
           onDisplayUri: (uri) async {
             _logger.i('WalletConnect URI: $uri');
             // Try opening the wallet using the URI

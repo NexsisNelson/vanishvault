@@ -13,8 +13,7 @@ final encryptionServiceProvider = Provider((ref) => EncryptionService());
 /// Provider for Walrus storage service (publisher & aggregator)
 final walrusStorageProvider = Provider(
   (ref) => WalrusStorageService(
-    publisherUrl: EnvironmentConfig.walrusUrl,
-    aggregatorUrl: EnvironmentConfig.walrusUrl,
+    walrusUrl: EnvironmentConfig.walrusUrl,
   ),
 );
 
@@ -117,6 +116,7 @@ class FileOperationNotifier extends StateNotifier<FileOperationState> {
         'keyHex': keyHex,
         'nonce': base64Encode(Uint8List.fromList(encrypted.nonce)),
         'mac': base64Encode(Uint8List.fromList(encrypted.mac)),
+        'contentHash': base64Encode(Uint8List.fromList(contentHash)),
       };
     } catch (e) {
       state = state.copyWith(isLoading: false, error: 'Upload failed: $e');

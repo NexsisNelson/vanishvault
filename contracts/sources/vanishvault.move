@@ -42,7 +42,7 @@ module vanishvault::vanishvault {
         receiver: address,
         clock: &Clock,
         ctx: &mut TxContext,
-    ) {
+    ): DataRoom {
         let now = clock::timestamp_ms(clock);
         let expires_at = now + TWENTYFOUR_HOURS_MS;
 
@@ -56,9 +56,9 @@ module vanishvault::vanishvault {
         };
 
         let room_id = object::id(&room);
-        
-        // Share the DataRoom so both creator and receiver can access it
-        transfer::share_object(room);
+
+        // Note: not sharing the object here so the caller receives the DataRoom
+        // (tests and callers expect ownership of the created object)
 
         sui::event::emit(RoomCreated {
             room_id,
@@ -67,6 +67,8 @@ module vanishvault::vanishvault {
             created_at: now,
             expires_at,
         });
+
+        room
     }
 
     /// Read-only verification function
@@ -105,7 +107,8 @@ module vanishvault::vanishvault {
         assert!(is_creator || has_expired, EUnauthorizedAccess);
 
         let room_id = object::id(&room);
-        object::delete(room.id);
+        let DataRoom { id, creator: _, receiver: _, walrus_blob_id: _, created_at: _, expires_at: _ } = room;
+        object::delete(id);
 
         sui::event::emit(RoomDestroyed {
             room_id,
@@ -131,5 +134,11 @@ module vanishvault::vanishvault {
     /// Getter: Check room info
     public fun get_room_info(room: &DataRoom): (address, address, u64, u64) {
         (room.creator, room.receiver, room.created_at, room.expires_at)
+    }
+
+    /// Test helper: Consume a DataRoom by transferring it to `recipient`.
+    /// This allows test code to properly consume the resource.
+    public fun consume_room(room: DataRoom, recipient: address) {
+        transfer::transfer(room, recipient);
     }
 }
