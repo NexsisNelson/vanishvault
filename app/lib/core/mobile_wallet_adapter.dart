@@ -65,22 +65,44 @@ class MobileWalletAdapter {
   }
 
   /// Build a deep-link URL for supported wallets as a fallback.
-  String buildDeepLinkForWallet(
-      {required String wallet,
-      required String payload,
-      required String callbackUrl}) {
-    // Common pattern: <wallet>://sign?payload=<payload>&callback=<callbackUrl>
+  String buildDeepLinkForWallet({
+    required String wallet,
+    required String payload,
+    required String callbackUrl,
+    bool preferUniversal = false,
+  }) {
+    // Encode payload and callback
     final encoded = Uri.encodeComponent(payload);
     final cb = Uri.encodeComponent(callbackUrl);
 
+    // Provide wallet-specific deep-link / universal-link formats.
+    // Use `preferUniversal` to return the recommended universal link where available.
     switch (wallet.toLowerCase()) {
       case 'phantom':
+        if (preferUniversal) {
+          // Phantom prefers universal links for JSON-RPC sessions
+          return 'https://phantom.app/ul/?payload=$encoded&redirect_link=$cb';
+        }
+        // Scheme (supported but discouraged)
         return 'phantom://sign?payload=$encoded&redirect_link=$cb';
+
       case 'slush':
+        if (preferUniversal) {
+          // Slush universal link domain
+          return 'https://my.slush.app/sui/sign?payload=$encoded&callback=$cb';
+        }
+        // Slush custom scheme
         return 'slush://sui/sign?payload=$encoded&callback=$cb';
+
       case 'bitget':
+        // Bitget currently uses a custom scheme pattern
         return 'bitget://wallet/sui/sign?payload=$encoded&callback=$cb';
+
       default:
+        // Generic fallback: try scheme then universal-like path
+        if (preferUniversal) {
+          return 'https://$wallet/?payload=$encoded&callback=$cb';
+        }
         return '$wallet://sign?payload=$encoded&callback=$cb';
     }
   }
