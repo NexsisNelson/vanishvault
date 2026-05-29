@@ -1,12 +1,13 @@
 import 'dart:async';
 import 'dart:convert';
 import 'package:logger/logger.dart';
-import 'package:uni_links/uni_links.dart';
+import 'package:app_links/app_links.dart';
 import 'sui_blockchain_service.dart';
 
 /// Handles incoming deep-links and routes signed transactions back to the Sui service
 class DeepLinkHandler {
   final Logger _logger;
+  final AppLinks _appLinks = AppLinks();
   StreamSubscription? _sub;
 
   DeepLinkHandler({Logger? logger}) : _logger = logger ?? Logger();
@@ -17,8 +18,7 @@ class DeepLinkHandler {
     // Cancel existing
     _sub?.cancel();
 
-    _sub = uriLinkStream.listen((Uri? uri) async {
-      if (uri == null) return;
+    _sub = _appLinks.uriLinkStream.listen((Uri uri) async {
       _logger.i('Deep link received: $uri');
 
       try {
