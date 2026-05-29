@@ -1,5 +1,4 @@
 import 'dart:async';
-import 'dart:convert';
 import 'package:url_launcher/url_launcher.dart';
 import 'package:walletconnect_dart/walletconnect_dart.dart';
 import 'package:logger/logger.dart';

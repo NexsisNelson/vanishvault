@@ -1,5 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'core/deep_link_handler.dart';
+import 'core/sui_blockchain_service.dart';
+import 'core/providers.dart';
 
 void main() {
   runApp(const ProviderScope(child: VanishVaultApp()));
@@ -29,9 +32,42 @@ class VanishVaultApp extends StatelessWidget {
         ),
       ),
       themeMode: ThemeMode.system,
-      home: const HomeScreen(),
+      home: const DeepLinkListenerWidget(child: HomeScreen()),
     );
   }
+}
+
+class DeepLinkListenerWidget extends ConsumerStatefulWidget {
+  final Widget child;
+  const DeepLinkListenerWidget({required this.child, Key? key})
+      : super(key: key);
+
+  @override
+  ConsumerState<DeepLinkListenerWidget> createState() =>
+      _DeepLinkListenerWidgetState();
+}
+
+class _DeepLinkListenerWidgetState
+    extends ConsumerState<DeepLinkListenerWidget> {
+  late DeepLinkHandler _handler;
+
+  @override
+  void initState() {
+    super.initState();
+    _handler = DeepLinkHandler();
+    // Start listening once SuiBlockchainService is available
+    final suiService = ref.read(suiBlockchainProvider);
+    _handler.startListening(suiService);
+  }
+
+  @override
+  void dispose() {
+    _handler.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) => widget.child;
 }
 
 class HomeScreen extends StatelessWidget {

@@ -380,4 +380,28 @@ class SuiBlockchainService {
       return 0;
     }
   }
+
+  /// Submit a signed transaction (received from mobile wallet deep-link)
+  /// `signedTx` can be a JSON string or serialized representation expected by the RPC.
+  Future<String> submitSignedTransaction(String signedTx) async {
+    try {
+      _logger.i('Submitting signed transaction to RPC');
+
+      final payload = {
+        'jsonrpc': '2.0',
+        'id': 1,
+        'method': 'sui_executeTransaction',
+        'params': [signedTx]
+      };
+
+      final resp = await _dio.post(rpcUrl, data: payload);
+      final result = resp.data['result'];
+      final digest = result?['digest'] ?? result?.toString() ?? '';
+      _logger.i('RPC response digest: $digest');
+      return digest.toString();
+    } catch (e) {
+      _logger.e('Failed to submit signed transaction: $e');
+      rethrow;
+    }
+  }
 }
