@@ -9,10 +9,9 @@ class FileUploadScreen extends ConsumerStatefulWidget {
 }
 
 class _FileUploadScreenState extends ConsumerState<FileUploadScreen> {
-  String? _selectedFilePath;
   final _receiverController = TextEditingController();
   final _walletController = TextEditingController();
-
+  String _selectedWallet = 'WalletConnect';
   String? _selectedFilePath;
 
   @override
@@ -71,14 +70,39 @@ class _FileUploadScreenState extends ConsumerState<FileUploadScreen> {
           const SizedBox(height: 12),
 
           // Wallet Address Input (uploader)
-          TextField(
-            controller: _walletController,
-            decoration: const InputDecoration(
-              labelText: 'Your Wallet Address',
-              hintText: 'Enter your wallet address (for signing)',
-              border: OutlineInputBorder(),
-              prefixIcon: Icon(Icons.account_balance_wallet_outlined),
-            ),
+          // Wallet Selection
+          Row(
+            children: [
+              Expanded(
+                child: DropdownButtonFormField<String>(
+                  value: _selectedWallet,
+                  items: const [
+                    DropdownMenuItem(
+                        value: 'WalletConnect', child: Text('WalletConnect')),
+                    DropdownMenuItem(value: 'Phantom', child: Text('Phantom')),
+                    DropdownMenuItem(value: 'Slush', child: Text('Slush')),
+                    DropdownMenuItem(value: 'Bitget', child: Text('Bitget')),
+                  ],
+                  onChanged: (v) =>
+                      setState(() => _selectedWallet = v ?? 'WalletConnect'),
+                  decoration: const InputDecoration(
+                    labelText: 'Wallet',
+                    border: OutlineInputBorder(),
+                  ),
+                ),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: TextField(
+                  controller: _walletController,
+                  decoration: const InputDecoration(
+                    labelText: 'Your Wallet Address',
+                    hintText: 'Enter your wallet address (for signing)',
+                    border: OutlineInputBorder(),
+                  ),
+                ),
+              ),
+            ],
           ),
           const SizedBox(height: 16),
           const SizedBox(height: 16),
@@ -177,12 +201,32 @@ class _FileUploadScreenState extends ConsumerState<FileUploadScreen> {
   }
 
   Future<void> _uploadFile() async {
+    // Show non-dismissible progress dialog while upload + signing occurs
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (_) => AlertDialog(
+        title: const Text('Waiting for wallet signature'),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: const [
+            CircularProgressIndicator(),
+            SizedBox(height: 12),
+            Text('Please approve the transaction in your wallet...'),
+          ],
+        ),
+      ),
+    );
+
     try {
       final result = await ref.read(fileOperationProvider.notifier).uploadFile(
             filePath: _selectedFilePath!,
             receiverAddress: _receiverController.text,
             walletAddress: _walletController.text,
           );
+
+      // Close progress dialog
+      if (mounted) Navigator.of(context).pop();
 
       if (mounted) {
         final tx = result['txDigest'];
@@ -221,6 +265,9 @@ class _FileUploadScreenState extends ConsumerState<FileUploadScreen> {
         );
       }
     } catch (e) {
+      // Close progress dialog if open
+      if (mounted) Navigator.of(context).pop();
+
       if (mounted) {
         ScaffoldMessenger.of(
           context,
