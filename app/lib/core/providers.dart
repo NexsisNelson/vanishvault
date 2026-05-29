@@ -22,8 +22,7 @@ final walrusStorageProvider = Provider(
 final suiBlockchainProvider = Provider(
   (ref) => SuiBlockchainService(
     rpcUrl: EnvironmentConfig.suiRpc,
-    packageId:
-        'YOUR_PACKAGE_ID_HERE', // Replace with actual deployed package ID
+    packageId: EnvironmentConfig.packageId,
   ),
 );
 
