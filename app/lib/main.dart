@@ -109,6 +109,15 @@ class HomeScreen extends StatelessWidget {
               icon: const Icon(Icons.file_download),
               label: const Text('Retrieve Files'),
             ),
+            const SizedBox(height: 16),
+            ElevatedButton.icon(
+              onPressed: () {
+                Navigator.of(context).push(MaterialPageRoute(
+                    builder: (_) => const WalletSessionScreen()));
+              },
+              icon: const Icon(Icons.link),
+              label: const Text('Wallet Sessions'),
+            ),
           ],
         ),
       ),
