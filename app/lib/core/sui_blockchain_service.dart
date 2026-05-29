@@ -1,4 +1,5 @@
 import 'package:logger/logger.dart';
+import 'package:dio/dio.dart';
 
 /// Handles Sui blockchain interactions for VanishVault
 /// This service builds and signs transactions for the Move contract
@@ -12,6 +13,8 @@ class SuiBlockchainService {
     required this.packageId,
     Logger? logger,
   }) : _logger = logger ?? Logger();
+
+  final Dio _dio = Dio();
 
   /// Initialize wallet connection (placeholder for actual implementation)
   /// In production, this would establish connection with Sui Wallet
@@ -54,8 +57,9 @@ class SuiBlockchainService {
 
       _logger.d('Transaction block built: $ptb');
 
-      // Sign and execute transaction (placeholder - actual impl uses sui package)
-      final txDigest = _signAndExecuteTransaction(
+      // Sign and execute transaction (placeholder - actual impl uses sui wallet SDK)
+      // Keep placeholder async signature so callers can await.
+      final txDigest = await _signAndExecuteTransaction(
         ptb: ptb,
         walletAddress: walletAddress,
       );
@@ -145,9 +149,8 @@ class SuiBlockchainService {
 
   /// Convert hex string (0x...) to u256 (BigInt)
   BigInt _hexStringToU256(String hexString) {
-    final cleanHex = hexString.startsWith('0x')
-        ? hexString.substring(2)
-        : hexString;
+    final cleanHex =
+        hexString.startsWith('0x') ? hexString.substring(2) : hexString;
     return BigInt.parse(cleanHex, radix: 16);
   }
 
@@ -218,40 +221,127 @@ class SuiBlockchainService {
 
   /// Sign and execute a transaction block (placeholder)
   /// In production, this would use @mysten/sui.js to sign via wallet
-  String _signAndExecuteTransaction({
+  /// Sign and execute a transaction block (placeholder)
+  /// In production, this would use a wallet SDK (sui.js or mobile wallet adapter)
+  Future<String> _signAndExecuteTransaction({
     required Map<String, dynamic> ptb,
     required String walletAddress,
-  }) {
+  }) async {
     _logger.d('Signing transaction with wallet: $walletAddress');
-    // Placeholder: actual implementation would sign with wallet SDK
+    // TODO: Implement signing via wallet SDK and submit to RPC
+    await Future.delayed(const Duration(milliseconds: 200));
     return 'txn_${DateTime.now().millisecondsSinceEpoch}';
   }
 
   /// Call get_blob_id() on the contract (placeholder)
   Future<BigInt> _callGetBlobId(String dataRoomObjectId) async {
-    _logger.d('Calling get_blob_id for DataRoom: $dataRoomObjectId');
-    // Placeholder: actual implementation would call via RPC
-    return BigInt.parse('0', radix: 16);
+    _logger.d(
+        'Calling get_blob_id for DataRoom (via sui_getObject): $dataRoomObjectId');
+
+    try {
+      final payload = {
+        'jsonrpc': '2.0',
+        'id': 1,
+        'method': 'sui_getObject',
+        'params': [dataRoomObjectId]
+      };
+
+      final resp = await _dio.post(rpcUrl, data: payload);
+      final result = resp.data['result'];
+
+      // Attempt to extract walrus_blob_id from the object fields
+      final fields = result?['data']?['content']?['data']?['fields'];
+      if (fields == null) {
+        throw Exception('Unexpected object format from RPC');
+      }
+
+      // The field name used in Move is likely `walrus_blob_id`. It may be a u256 or string.
+      final blobField = fields['walrus_blob_id'] ??
+          fields['blob_id'] ??
+          fields['walrusBlobId'];
+      if (blobField == null) {
+        throw Exception('walrus_blob_id not found in object fields');
+      }
+
+      // Handle different representations
+      String blobHex;
+      if (blobField is Map && blobField.containsKey('data')) {
+        blobHex = blobField['data'].toString();
+      } else {
+        blobHex = blobField.toString();
+      }
+
+      // Normalize and convert to BigInt
+      final cleanHex =
+          blobHex.startsWith('0x') ? blobHex.substring(2) : blobHex;
+      return BigInt.parse(cleanHex, radix: 16);
+    } catch (e) {
+      _logger.e('Failed to call get_blob_id via RPC: $e');
+      rethrow;
+    }
   }
 
   /// Execute destroy transaction (placeholder)
   Future<String> _executeDestroyTransaction(Map<String, dynamic> ptb) async {
     _logger.d('Executing destroy transaction...');
-    // Placeholder
+    // TODO: Implement signing and submission via wallet SDK or RPC
+    await Future.delayed(const Duration(milliseconds: 200));
     return 'destroy_${DateTime.now().millisecondsSinceEpoch}';
   }
 
   /// Query is_expired() function (placeholder)
   Future<bool> _queryIsExpired(String dataRoomObjectId) async {
-    _logger.d('Querying expiration status...');
-    // Placeholder
-    return false;
+    _logger.d('Querying expiration status via RPC...');
+    try {
+      final payload = {
+        'jsonrpc': '2.0',
+        'id': 1,
+        'method': 'sui_getObject',
+        'params': [dataRoomObjectId]
+      };
+
+      final resp = await _dio.post(rpcUrl, data: payload);
+      final fields =
+          resp.data['result']?['data']?['content']?['data']?['fields'];
+      if (fields == null) return true;
+
+      final expiresAt = fields['expires_at'] ?? fields['expiresAt'];
+      if (expiresAt == null) return true;
+
+      // Assume expiresAt is milliseconds since epoch
+      final expiresMs = int.parse(expiresAt.toString());
+      return DateTime.now().millisecondsSinceEpoch > expiresMs;
+    } catch (e) {
+      _logger.e('Failed to query expiration: $e');
+      return true;
+    }
   }
 
   /// Query time_until_expiration() function (placeholder)
   Future<int> _queryTimeUntilExpiration(String dataRoomObjectId) async {
-    _logger.d('Querying time until expiration...');
-    // Placeholder
-    return 86400000; // 24 hours
+    _logger.d('Querying time until expiration via RPC...');
+    try {
+      final payload = {
+        'jsonrpc': '2.0',
+        'id': 1,
+        'method': 'sui_getObject',
+        'params': [dataRoomObjectId]
+      };
+
+      final resp = await _dio.post(rpcUrl, data: payload);
+      final fields =
+          resp.data['result']?['data']?['content']?['data']?['fields'];
+      if (fields == null) return 0;
+
+      final expiresAt = fields['expires_at'] ?? fields['expiresAt'];
+      if (expiresAt == null) return 0;
+
+      final expiresMs = int.parse(expiresAt.toString());
+      final remaining = expiresMs - DateTime.now().millisecondsSinceEpoch;
+      return remaining > 0 ? remaining : 0;
+    } catch (e) {
+      _logger.e('Failed to query time until expiration: $e');
+      return 0;
+    }
   }
 }
