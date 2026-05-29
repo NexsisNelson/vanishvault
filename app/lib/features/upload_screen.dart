@@ -223,6 +223,7 @@ class _FileUploadScreenState extends ConsumerState<FileUploadScreen> {
             filePath: _selectedFilePath!,
             receiverAddress: _receiverController.text,
             walletAddress: _walletController.text,
+            wallet: _selectedWallet,
           );
 
       // Close progress dialog

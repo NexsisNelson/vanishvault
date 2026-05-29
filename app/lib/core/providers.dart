@@ -77,6 +77,7 @@ class FileOperationNotifier extends StateNotifier<FileOperationState> {
     required String filePath,
     required String receiverAddress,
     required String walletAddress,
+    String? wallet,
   }) async {
     state = state.copyWith(isLoading: true, error: null);
 
@@ -102,6 +103,7 @@ class FileOperationNotifier extends StateNotifier<FileOperationState> {
         blobId: blobId,
         receiverAddress: receiverAddress,
         walletAddress: walletAddress,
+        wallet: wallet,
       );
 
       state = state.copyWith(isLoading: false, progress: 1.0);

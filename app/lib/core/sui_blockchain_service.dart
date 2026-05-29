@@ -42,6 +42,7 @@ class SuiBlockchainService {
     required String blobId,
     required String receiverAddress,
     required String walletAddress,
+    String? wallet,
   }) async {
     try {
       _logger.i('Registering DataRoom on Sui blockchain...');
@@ -70,11 +71,15 @@ class SuiBlockchainService {
           txDigest = await _walletAdapter
               .requestSignAndExecuteWithWalletConnect(txRequest: ptb);
         } else {
-          // Fallback deep-link for common wallets (app must handle callback)
+          // Fallback deep-link for selected wallet (app must handle callback)
           final payload = jsonEncode(ptb);
           final callback = 'vanishvault://signed_tx_callback';
+          final chosen = wallet ?? 'phantom';
           final dl = _walletAdapter.buildDeepLinkForWallet(
-              wallet: 'phantom', payload: payload, callbackUrl: callback);
+              wallet: chosen,
+              payload: payload,
+              callbackUrl: callback,
+              preferUniversal: true);
           await _walletAdapter.openDeepLink(dl);
           // The app should receive the signed tx via callback; for now return placeholder
           txDigest = 'txn_pending_user_signature';
